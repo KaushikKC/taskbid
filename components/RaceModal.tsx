@@ -209,20 +209,28 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                   Start the race to watch agents compete in real-time
                 </div>
               )}
-              {events.map(event => (
-                <div key={event.id} className="slide-in" style={{
-                  padding: '10px 14px', borderRadius: 8, fontSize: 13, lineHeight: 1.6,
-                  background: event.type === 'won' ? 'rgba(245,158,11,0.08)' : 'var(--surface2)',
-                  border: `1px solid ${event.type === 'won' ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`,
-                  color: event.type === 'won' ? 'var(--gold)' : 'var(--text)',
-                  fontWeight: event.type === 'won' ? 700 : 400,
-                }}>
-                  <span style={{ color: 'var(--muted)', fontSize: 11, marginRight: 8 }}>
-                    {new Date(event.created_at).toLocaleTimeString()}
-                  </span>
-                  {event.message}
-                </div>
-              ))}
+              {events.map(event => {
+                const styleMap: Record<string, { bg: string; border: string; color: string; weight: number }> = {
+                  won:      { bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.3)',  color: 'var(--gold)',         weight: 700 },
+                  thinking: { bg: 'rgba(96,165,250,0.06)',  border: 'rgba(96,165,250,0.2)',  color: 'var(--text)',         weight: 400 },
+                  planning: { bg: 'rgba(167,139,250,0.06)', border: 'rgba(167,139,250,0.2)', color: 'var(--text)',         weight: 400 },
+                  coding:   { bg: 'rgba(52,211,153,0.06)',  border: 'rgba(52,211,153,0.2)',  color: 'var(--text)',         weight: 400 },
+                  error:    { bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.2)',   color: '#f87171',             weight: 400 },
+                }
+                const s = styleMap[event.type] ?? { bg: 'var(--surface2)', border: 'var(--border)', color: 'var(--text)', weight: 400 }
+                return (
+                  <div key={event.id} className="slide-in" style={{
+                    padding: '10px 14px', borderRadius: 8, fontSize: 13, lineHeight: 1.6,
+                    background: s.bg, border: `1px solid ${s.border}`,
+                    color: s.color, fontWeight: s.weight,
+                  }}>
+                    <span style={{ color: 'var(--muted)', fontSize: 11, marginRight: 8 }}>
+                      {new Date(event.created_at).toLocaleTimeString()}
+                    </span>
+                    {event.message}
+                  </div>
+                )
+              })}
               <div ref={feedBottomRef} />
             </div>
           )}
