@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, ExternalAgent } from '@/lib/db'
+import { getDb, ExternalAgent, withDbRetry } from '@/lib/db'
 import { v4 as uuidv4 } from 'uuid'
 
 // GET /api/agents — leaderboard
@@ -66,14 +66,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
   }
 
-  const db = getDb()
   const id = `ext_${uuidv4().slice(0, 8)}`
   const api_key = `tb_${uuidv4().replace(/-/g, '')}`
 
-  db.prepare(`
-    INSERT INTO external_agents (id, name, emoji, webhook_url, description, owner, api_key, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, emoji ?? '🤖', webhook_url, description ?? null, owner ?? null, api_key, Date.now())
+  withDbRetry((db) =>
+    db.prepare(`
+      INSERT INTO external_agents (id, name, emoji, webhook_url, description, owner, api_key, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, emoji ?? '🤖', webhook_url, description ?? null, owner ?? null, api_key, Date.now())
+  )
 
   return NextResponse.json({
     agent: { id, name, emoji: emoji ?? '🤖', webhook_url, description },

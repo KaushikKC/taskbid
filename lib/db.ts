@@ -1,9 +1,57 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 
-let db: Database.Database
+let db: Database.Database | null = null
+
+function invalidateDb() {
+  db = null
+}
+
+function isSqliteReadonlyMoved(err: unknown): boolean {
+  // better-sqlite3 throws with shape: { code: 'SQLITE_...', message: '...' }
+  const anyErr = err as { code?: unknown; message?: unknown } | null
+  const code = anyErr?.code
+  const msg = typeof anyErr?.message === 'string' ? anyErr.message : String(err)
+
+  return (
+    code === 'SQLITE_READONLY_DBMOVED' ||
+    msg.includes('readonly database') ||
+    msg.includes('attempt to write a readonly') ||
+    msg.includes('SQLITE_READONLY')
+  )
+}
+
+function withDbRetry<T>(op: (db: Database.Database) => T, retries = 1): T {
+  let lastErr: unknown
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const conn = getDb()
+      return op(conn)
+    } catch (err) {
+      lastErr = err
+      if (attempt < retries && isSqliteReadonlyMoved(err)) {
+        invalidateDb()
+        continue
+      }
+      throw err
+    }
+  }
+
+  // Should be unreachable (loop either returns or throws)
+  throw lastErr
+}
 
 function getDb(): Database.Database {
+  // Reconnect if connection is dead (e.g. file deleted while server was running)
+  if (db) {
+    try {
+      db.prepare('SELECT 1').get()
+    } catch {
+      invalidateDb()
+    }
+  }
+
   if (!db) {
     db = new Database(path.join(process.cwd(), 'taskbid.db'))
     db.exec(`
@@ -69,7 +117,7 @@ function getDb(): Database.Database {
       seedDemoTasks(db)
     }
   }
-  return db
+  return db!
 }
 
 function seedDemoTasks(db: Database.Database) {
@@ -119,7 +167,7 @@ Example: \`"babad" → "bab"\`, \`"cbbd" → "bb"\``,
   }
 }
 
-export { getDb }
+export { getDb, withDbRetry, invalidateDb }
 export type Task = {
   id: string
   title: string

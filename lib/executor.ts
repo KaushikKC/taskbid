@@ -1,9 +1,3 @@
-/**
- * Sandboxed code executor for judging submissions.
- * Runs submitted JS/TS code in isolation, captures stdout, compares output.
- * Falls back to LLM judge for non-executable tasks.
- */
-
 export type ExecutionResult = {
   passed: boolean
   actualOutput: string
@@ -13,9 +7,23 @@ export type ExecutionResult = {
 }
 
 /**
- * Executes JavaScript code in a sandboxed vm context with a timeout.
- * The code is expected to export a function or produce a result via console.log.
+ * Extracts the first function name from submitted code.
+ * Handles: function foo(, const foo =, const foo=(
  */
+function extractFunctionName(code: string): string | null {
+  const patterns = [
+    /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/,        // function foo(
+    /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\(/, // const foo = (
+    /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?function/, // const foo = function
+    /(?:let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\(/, // let foo = (
+  ]
+  for (const p of patterns) {
+    const m = code.match(p)
+    if (m) return m[1]
+  }
+  return null
+}
+
 export async function executeCode(
   code: string,
   testInput: string,
@@ -25,72 +33,55 @@ export async function executeCode(
   const start = Date.now()
 
   try {
-    // Use Node's built-in vm module (available server-side in Next.js)
     const { runInNewContext } = await import('vm')
+
+    const fnName = extractFunctionName(code)
+    if (!fnName) {
+      return {
+        passed: false,
+        actualOutput: '',
+        expectedOutput,
+        error: 'Could not detect function name in submitted code',
+        executionMs: Date.now() - start,
+      }
+    }
 
     const logs: string[] = []
     const sandbox = {
-      console: {
-        log: (...args: unknown[]) => logs.push(args.map(String).join(' ')),
-        error: (...args: unknown[]) => logs.push('[err] ' + args.map(String).join(' ')),
-      },
-      JSON,
-      Math,
-      Array,
-      Object,
-      String,
-      Number,
-      Boolean,
-      parseInt,
-      parseFloat,
-      isNaN,
-      isFinite,
+      console: { log: (...a: unknown[]) => logs.push(a.map(String).join(' ')) },
+      JSON, Math, Array, Object, String, Number, Boolean,
+      parseInt, parseFloat, isNaN, isFinite, Set, Map,
     }
 
-    // Wrap code to auto-call the main function with test input and log result
+    // Parse input: try number first, then string
+    const numInput = Number(testInput)
+    const parsedInput = !isNaN(numInput) && testInput.trim() !== ''
+      ? numInput
+      : testInput
+
     const wrappedCode = `
 ${code}
 
-// Auto-detect and call the exported function
-const _fns = Object.keys(this).filter(k => typeof this[k] === 'function' && !['console','JSON','Math','Array','Object','String','Number','Boolean','parseInt','parseFloat','isNaN','isFinite'].includes(k));
-if (_fns.length > 0) {
-  const _fn = this[_fns[0]];
-  try {
-    const _input = ${JSON.stringify(testInput)};
-    // Try to parse input as number, then as args
-    let _result;
-    const _num = Number(_input);
-    if (!isNaN(_num) && _input.trim() !== '') {
-      _result = _fn(_num);
-    } else {
-      _result = _fn(_input);
-    }
-    console.log(JSON.stringify(_result));
-  } catch(e) {
-    console.log('[exec-error] ' + e.message);
-  }
+try {
+  const _result = ${fnName}(${JSON.stringify(parsedInput)});
+  console.log(JSON.stringify(_result));
+} catch (e) {
+  console.log('[exec-error] ' + e.message);
 }
 `
     runInNewContext(wrappedCode, sandbox, { timeout: timeoutMs })
 
     const actualOutput = logs.join('\n').trim()
-    const normalizedActual = normalizeOutput(actualOutput)
-    const normalizedExpected = normalizeOutput(expectedOutput)
-    const passed = normalizedActual === normalizedExpected
+    const passed = normalizeOutput(actualOutput) === normalizeOutput(expectedOutput)
 
-    return {
-      passed,
-      actualOutput,
-      expectedOutput,
-      executionMs: Date.now() - start,
-    }
+    return { passed, actualOutput, expectedOutput, executionMs: Date.now() - start }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error ? err.message : String(err)
     return {
       passed: false,
       actualOutput: '',
       expectedOutput,
-      error: message.includes('timed out') ? 'Execution timed out (5s limit)' : message,
+      error: msg.includes('timed out') ? 'Timed out (5s limit)' : msg,
       executionMs: Date.now() - start,
     }
   }
@@ -98,7 +89,6 @@ if (_fns.length > 0) {
 
 function normalizeOutput(s: string): string {
   try {
-    // Parse and re-serialize JSON to normalize whitespace/ordering
     return JSON.stringify(JSON.parse(s))
   } catch {
     return s.trim().toLowerCase()

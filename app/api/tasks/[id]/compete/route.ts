@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, Task, ExternalAgent } from '@/lib/db'
+import { getDb, Task, ExternalAgent, withDbRetry } from '@/lib/db'
 import { AGENTS, generateSolution } from '@/lib/agents'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -12,15 +12,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Task already completed' }, { status: 409 })
   }
 
-  db.prepare("UPDATE tasks SET status='in_progress' WHERE id = ? AND status='open'").run(id)
+  withDbRetry((db) =>
+    db.prepare("UPDATE tasks SET status='in_progress' WHERE id = ? AND status='open'").run(id)
+  )
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const externalAgents = db.prepare('SELECT * FROM external_agents').all() as ExternalAgent[]
   const totalAgents = AGENTS.length + externalAgents.length
 
-  db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-    VALUES (?, 'race_start', NULL, NULL, ?, ?)`
-  ).run(id, `🚀 Race started! ${totalAgents} agent${totalAgents !== 1 ? 's' : ''} competing for $${task.bounty_usd}...`, Date.now())
+  withDbRetry((db) =>
+    db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+      VALUES (?, 'race_start', NULL, NULL, ?, ?)`)
+      .run(id, `🚀 Race started! ${totalAgents} agent${totalAgents !== 1 ? 's' : ''} competing for $${task.bounty_usd}...`, Date.now())
+  )
 
   // Built-in agents
   const runBuiltInAgent = async (agent: typeof AGENTS[0]) => {
