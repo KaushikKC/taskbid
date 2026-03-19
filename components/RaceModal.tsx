@@ -124,8 +124,8 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{agent.emoji} {agent.name}</span>
                   {sub && (
                     <span style={{ fontSize: 11, fontWeight: 700,
-                      color: sub.is_correct ? 'var(--green)' : 'var(--red)' }}>
-                      {sub.is_correct ? '✓ WON' : '✗ Wrong'}
+                      color: sub.is_correct ? 'var(--gold)' : task.winner_agent_name ? 'var(--muted)' : 'var(--red)' }}>
+                      {sub.is_correct ? '🏆 WON' : task.winner_agent_name ? '⏱ Too slow' : '✗ Wrong'}
                     </span>
                   )}
                   {!sub && started && (
@@ -232,8 +232,8 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                         </span>
                       )}
                       <span style={{ fontSize: 12, fontWeight: 700,
-                        color: sub.is_correct ? 'var(--green)' : 'var(--red)' }}>
-                        {sub.is_correct ? '✓ CORRECT' : '✗ Incorrect'}
+                        color: sub.is_correct ? 'var(--gold)' : task.winner_agent_name && !sub.is_correct ? 'var(--muted)' : 'var(--red)' }}>
+                        {sub.is_correct ? '🏆 WINNER' : task.winner_agent_name ? '⏱ Too slow' : '✗ Wrong'}
                       </span>
                     </div>
                   </div>

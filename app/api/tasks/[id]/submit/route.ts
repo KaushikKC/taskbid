@@ -52,47 +52,56 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     solution,
   )
 
-  // Save submission
+  // Attempt to claim the win atomically — only the first correct solution wins
+  let wonTheBounty = false
+  if (result.correct) {
+    const updateResult = db.prepare(`
+      UPDATE tasks SET status='completed', winner_agent_id=?, winner_agent_name=?,
+        winning_solution=?, completed_at=? WHERE id = ? AND status != 'completed'
+    `).run(agent_id, agent_name, solution, now + 100, id)
+    wonTheBounty = updateResult.changes > 0
+  }
+
+  // Save submission — is_correct=1 only for the actual winner, not just any correct answer
   db.prepare(`
     INSERT INTO submissions (id, task_id, agent_id, agent_name, agent_emoji, solution, is_correct, judge_feedback, payment_receipt, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     submissionId, id, agent_id, agent_name, agent_emoji, solution,
-    result.correct ? 1 : 0, result.feedback, 'tempo:receipt:' + uuidv4(), now + 100,
+    wonTheBounty ? 1 : 0, result.feedback, 'tempo:receipt:' + uuidv4(), now + 150,
   )
 
-  if (result.correct) {
-    // First correct solution wins — mark task complete
-    db.prepare(`
-      UPDATE tasks SET status='completed', winner_agent_id=?, winner_agent_name=?,
-        winning_solution=?, completed_at=? WHERE id = ? AND status != 'completed'
-    `).run(agent_id, agent_name, solution, now + 200, id)
-
-    const updated = db.prepare('SELECT status FROM tasks WHERE id = ?').get(id) as { status: string }
-
-    if (updated.status === 'completed') {
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'won', ?, ?, ?, ?)`
-      ).run(id, agent_name, agent_emoji,
-        `🏆 ${agent_emoji} ${agent_name} WON the bounty of $${task.bounty_usd}! Payment sent via Tempo in 0.6s.`,
-        now + 300,
-      )
-    }
+  if (wonTheBounty) {
+    db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+      VALUES (?, 'won', ?, ?, ?, ?)`
+    ).run(id, agent_name, agent_emoji,
+      `🏆 ${agent_emoji} ${agent_name} WON the bounty of $${task.bounty_usd}! Payment sent via Tempo in 0.6s.`,
+      now + 200,
+    )
+  } else if (result.correct) {
+    // Correct but another agent already claimed the bounty
+    db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+      VALUES (?, 'late', ?, ?, ?, ?)`
+    ).run(id, agent_name, agent_emoji,
+      `⏱ ${agent_emoji} ${agent_name}'s solution was correct but arrived too late — bounty already claimed!`,
+      now + 200,
+    )
   } else {
     db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
       VALUES (?, 'rejected', ?, ?, ?, ?)`
     ).run(id, agent_name, agent_emoji,
       `❌ ${agent_emoji} ${agent_name}'s solution was incorrect. ${result.feedback}`,
-      now + 100,
+      now + 200,
     )
   }
 
   const responseBody = {
     submission_id: submissionId,
     correct: result.correct,
+    won: wonTheBounty,
     score: result.score,
     feedback: result.feedback,
-    bounty_won: result.correct ? task.bounty_usd : null,
+    bounty_won: wonTheBounty ? task.bounty_usd : null,
   }
 
   return NextResponse.json(responseBody, { status: result.correct ? 200 : 422 })
