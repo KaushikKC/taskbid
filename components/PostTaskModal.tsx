@@ -11,7 +11,7 @@ type Props = {
 const EXAMPLES = [
   {
     title: 'Fibonacci Memoized',
-    description: `Write a function \`fib(n: number): number\` that returns the nth Fibonacci number using memoization.
+    description: `Write a function fib(n) that returns the nth Fibonacci number using memoization.
 fib(0) = 0, fib(1) = 1, fib(10) = 55, fib(20) = 6765`,
     bounty: '1.00',
     test_input: '20',
@@ -19,10 +19,10 @@ fib(0) = 0, fib(1) = 1, fib(10) = 55, fib(20) = 6765`,
   },
   {
     title: 'Anagram Detector',
-    description: `Write a function \`areAnagrams(a: string, b: string): boolean\` that returns true if both strings are anagrams of each other (case-insensitive, ignoring spaces).
-"listen" and "silent" → true, "hello" and "world" → false`,
+    description: `Write a function areAnagrams(a, b) that returns true if both strings are anagrams of each other (case-insensitive, ignoring spaces).
+areAnagrams("listen", "silent") → true, areAnagrams("hello", "world") → false`,
     bounty: '0.50',
-    test_input: 'listen silent',
+    test_input: '["listen", "silent"]',
     expected_output: 'true',
   },
 ]
@@ -122,32 +122,38 @@ export default function PostTaskModal({ onClose, onCreated }: Props) {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Test Input</label>
-              <input
-                value={testInput}
-                onChange={e => setTestInput(e.target.value)}
-                placeholder="e.g. ({[]})"
-                style={{
-                  width: '100%', padding: '10px 12px', background: 'var(--surface2)',
-                  border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)',
-                  fontSize: 13, outline: 'none', fontFamily: 'monospace',
-                }}
-              />
+          <div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Test Input</label>
+                <input
+                  value={testInput}
+                  onChange={e => setTestInput(e.target.value)}
+                  placeholder='5  or  "hello"  or  ["arg1","arg2"]'
+                  style={{
+                    width: '100%', padding: '10px 12px', background: 'var(--surface2)',
+                    border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)',
+                    fontSize: 13, outline: 'none', fontFamily: 'monospace',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Expected Output</label>
+                <input
+                  value={expectedOutput}
+                  onChange={e => setExpectedOutput(e.target.value)}
+                  placeholder='true  or  42  or  "racecar"'
+                  style={{
+                    width: '100%', padding: '10px 12px', background: 'var(--surface2)',
+                    border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)',
+                    fontSize: 13, outline: 'none', fontFamily: 'monospace',
+                  }}
+                />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Expected Output</label>
-              <input
-                value={expectedOutput}
-                onChange={e => setExpectedOutput(e.target.value)}
-                placeholder="e.g. true"
-                style={{
-                  width: '100%', padding: '10px 12px', background: 'var(--surface2)',
-                  border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)',
-                  fontSize: 13, outline: 'none', fontFamily: 'monospace',
-                }}
-              />
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+              💡 <strong>Multi-arg functions:</strong> use a JSON array for test input —{' '}
+              <code style={{ fontFamily: 'monospace' }}>{`["listen", "silent"]`}</code> calls <code style={{ fontFamily: 'monospace' }}>fn("listen", "silent")</code>
             </div>
           </div>
 

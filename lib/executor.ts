@@ -70,17 +70,32 @@ export async function executeCode(
       parseInt, parseFloat, isNaN, isFinite, Set, Map,
     }
 
-    // Parse input: try number first, then string
-    const numInput = Number(testInput)
-    const parsedInput = !isNaN(numInput) && testInput.trim() !== ''
-      ? numInput
-      : testInput
+    // Parse input into one or more arguments:
+    //   JSON array  → spread as multiple args: ["listen","silent"] → fn("listen","silent")
+    //   JSON number → single numeric arg:       42 → fn(42)
+    //   plain string→ single string arg:        "hello" → fn("hello")
+    let callArgs: string
+    const trimmedInput = testInput.trim()
+    try {
+      const parsed = JSON.parse(trimmedInput)
+      if (Array.isArray(parsed)) {
+        callArgs = parsed.map((v: unknown) => JSON.stringify(v)).join(', ')
+      } else {
+        callArgs = JSON.stringify(parsed)
+      }
+    } catch {
+      // Not valid JSON — treat as plain string
+      const numInput = Number(trimmedInput)
+      callArgs = !isNaN(numInput) && trimmedInput !== ''
+        ? String(numInput)
+        : JSON.stringify(trimmedInput)
+    }
 
     const wrappedCode = `
 ${processedCode}
 
 try {
-  const _result = ${fnName}(${JSON.stringify(parsedInput)});
+  const _result = ${fnName}(${callArgs});
   console.log(JSON.stringify(_result));
 } catch (e) {
   console.log('[exec-error] ' + e.message);
