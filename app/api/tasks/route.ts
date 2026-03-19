@@ -17,12 +17,27 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { title, description, bounty_usd, test_input, expected_output } = body
-
-  if (!title || !description || !bounty_usd) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  // Rate limit: 20 new tasks per IP per hour
+  const rl = rateLimit(`post-task:${getClientIp(req.headers)}`, 20, 60 * 60 * 1000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests — try again later' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
+    )
   }
+
+  const raw = await req.json().catch(() => null)
+  if (!raw) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+
+  const parsed = CreateTaskSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    )
+  }
+
+  const { title, description, bounty_usd, test_input, expected_output } = parsed.data
 
   const id = `task_${uuidv4().slice(0, 8)}`
 

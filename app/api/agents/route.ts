@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, ExternalAgent, withDbRetry } from '@/lib/db'
 import { getProviderInfo } from '@/lib/llm'
+import { RegisterAgentSchema } from '@/lib/schemas'
+import { rateLimit, getClientIp } from '@/lib/ratelimit'
 import { v4 as uuidv4 } from 'uuid'
 
 // GET /api/agents — leaderboard
@@ -56,19 +58,27 @@ export async function GET() {
 
 // POST /api/agents — register an external agent
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { name, emoji, webhook_url, description, owner } = body
-
-  if (!name || !webhook_url) {
-    return NextResponse.json({ error: 'name and webhook_url are required' }, { status: 400 })
+  // Rate limit: 5 registrations per IP per hour
+  const rl = rateLimit(`register-agent:${getClientIp(req.headers)}`, 5, 60 * 60 * 1000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many registrations — try again later' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
+    )
   }
 
-  // Validate webhook URL is reachable
-  try {
-    new URL(webhook_url)
-  } catch {
-    return NextResponse.json({ error: 'Invalid webhook URL' }, { status: 400 })
+  const raw = await req.json().catch(() => null)
+  if (!raw) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+
+  const parsed = RegisterAgentSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    )
   }
+
+  const { name, emoji, webhook_url, description, owner } = parsed.data
 
   const id = `ext_${uuidv4().slice(0, 8)}`
   const api_key = `tb_${uuidv4().replace(/-/g, '')}`

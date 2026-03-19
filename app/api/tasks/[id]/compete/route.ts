@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, Task, ExternalAgent, withDbRetry } from '@/lib/db'
 import { AGENTS, generateSolution } from '@/lib/agents'
+import { rateLimit, getClientIp } from '@/lib/ratelimit'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Rate limit: 10 race starts per IP per minute
+  const rl = rateLimit(`compete:${getClientIp(req.headers)}`, 10, 60 * 1000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests — try again later' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
+    )
+  }
+
   const { id } = await params
   const db = getDb()
 
