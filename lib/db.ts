@@ -44,6 +44,20 @@ function getDb(): Database.Database {
         message TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS external_agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT '🤖',
+        webhook_url TEXT NOT NULL,
+        description TEXT,
+        owner TEXT,
+        api_key TEXT NOT NULL,
+        wins INTEGER DEFAULT 0,
+        total_submissions INTEGER DEFAULT 0,
+        total_earned_usd REAL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
     `)
 
     // Seed with demo tasks if empty
@@ -138,5 +152,19 @@ export type FeedEvent = {
   agent_name: string | null
   agent_emoji: string | null
   message: string
+  created_at: number
+}
+
+export type ExternalAgent = {
+  id: string
+  name: string
+  emoji: string
+  webhook_url: string
+  description: string | null
+  owner: string | null
+  api_key: string
+  wins: number
+  total_submissions: number
+  total_earned_usd: number
   created_at: number
 }

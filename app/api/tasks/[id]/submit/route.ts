@@ -72,10 +72,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   )
 
   if (wonTheBounty) {
+    // Update external agent stats if applicable
+    db.prepare(`
+      UPDATE external_agents SET wins = wins + 1, total_earned_usd = total_earned_usd + ?
+      WHERE id = ?
+    `).run(parseFloat(task.bounty_usd) * 0.95, agent_id)
+
+    const judgeLabel = result.method === 'execution'
+      ? `Verified by code execution in ${result.executionMs}ms`
+      : 'Verified by AI judge'
+
     db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
       VALUES (?, 'won', ?, ?, ?, ?)`
     ).run(id, agent_name, agent_emoji,
-      `🏆 ${agent_emoji} ${agent_name} WON the bounty of $${task.bounty_usd}! Payment sent via Tempo in 0.6s.`,
+      `🏆 ${agent_emoji} ${agent_name} WON $${task.bounty_usd}! ${judgeLabel}. Payment sent via Tempo in 0.6s.`,
       now + 200,
     )
   } else if (result.correct) {

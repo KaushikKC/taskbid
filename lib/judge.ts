@@ -1,13 +1,15 @@
 import Groq from 'groq-sdk'
+import { executeCode } from './executor'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export type JudgeResult = {
   correct: boolean
   feedback: string
-  score: number // 0-100
+  score: number
+  method: 'execution' | 'llm' // how the solution was judged
+  actualOutput?: string
+  executionMs?: number
 }
 
 export async function judgeSubmission(
@@ -16,34 +18,54 @@ export async function judgeSubmission(
   expectedOutput: string | null,
   solution: string,
 ): Promise<JudgeResult> {
-  const prompt = `You are a strict but fair code judge for a competitive programming contest.
+  // ── Phase 1: Real code execution (reliable, objective) ──────────────────────
+  if (testInput && expectedOutput) {
+    const exec = await executeCode(solution, testInput, expectedOutput)
 
-TASK:
-${taskDescription}
+    if (!exec.error) {
+      return {
+        correct: exec.passed,
+        score: exec.passed ? 100 : 0,
+        feedback: exec.passed
+          ? `Code executed correctly. Output: ${exec.actualOutput} (${exec.executionMs}ms)`
+          : `Wrong output. Got: "${exec.actualOutput}", expected: "${exec.expectedOutput}"`,
+        method: 'execution',
+        actualOutput: exec.actualOutput,
+        executionMs: exec.executionMs,
+      }
+    }
 
-${testInput ? `TEST INPUT: ${testInput}` : ''}
+    // Execution errored (syntax error, timeout, etc.) — still wrong
+    if (exec.error && !exec.error.includes('not a function')) {
+      return {
+        correct: false,
+        score: 0,
+        feedback: `Execution error: ${exec.error}`,
+        method: 'execution',
+        executionMs: exec.executionMs,
+      }
+    }
+  }
+
+  // ── Phase 2: LLM judge fallback (for research/open-ended tasks) ─────────────
+  const prompt = `You are a strict code judge. Evaluate this submission and respond in JSON only.
+
+TASK: ${taskDescription}
+${testInput ? `INPUT: ${testInput}` : ''}
 ${expectedOutput ? `EXPECTED OUTPUT: ${expectedOutput}` : ''}
 
-SUBMITTED SOLUTION:
+SUBMISSION:
 \`\`\`
 ${solution}
 \`\`\`
 
-Evaluate this solution:
-1. Is the logic correct for the problem?
-2. Would it produce the correct output for the test input?
-3. Is it free of obvious bugs?
-
-Respond in JSON exactly like this:
-{
-  "correct": true/false,
-  "score": 0-100,
-  "feedback": "brief 1-2 sentence explanation"
-}`
+JSON response (no other text):
+{"correct": true/false, "score": 0-100, "feedback": "one sentence"}`
 
   const response = await groq.chat.completions.create({
     model: 'llama-3.1-8b-instant',
-    max_tokens: 256,
+    max_tokens: 128,
+    temperature: 0,
     messages: [{ role: 'user', content: prompt }],
   })
 
@@ -52,10 +74,11 @@ Respond in JSON exactly like this:
     const json = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? '{}')
     return {
       correct: Boolean(json.correct),
-      feedback: json.feedback ?? 'No feedback provided',
+      feedback: String(json.feedback ?? 'No feedback'),
       score: Number(json.score ?? 0),
+      method: 'llm',
     }
   } catch {
-    return { correct: false, feedback: 'Judge evaluation failed', score: 0 }
+    return { correct: false, feedback: 'Judge unavailable', score: 0, method: 'llm' }
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import TaskCard from '@/components/TaskCard'
 import PostTaskModal from '@/components/PostTaskModal'
 import RaceModal from '@/components/RaceModal'
@@ -62,6 +63,9 @@ export default function Home() {
               <span>+</span>
               <span style={{ color: 'var(--accent-light)', fontWeight: 600 }}>Tempo</span>
             </div>
+            <Link href="/leaderboard" className="btn btn-ghost" style={{ textDecoration: 'none', fontSize: 13 }}>
+              🏆 Leaderboard
+            </Link>
             <button className="btn btn-primary" onClick={() => setShowPost(true)}>
               + Post Task
             </button>
