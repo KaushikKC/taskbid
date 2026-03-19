@@ -7,6 +7,22 @@ export type ExecutionResult = {
 }
 
 /**
+ * Strip markdown code fences so the code can run in a vm context.
+ * We rely on the agent prompt specifying plain JavaScript — if the LLM
+ * still returns TypeScript, execution will fail and fall back to the LLM judge.
+ */
+function preprocessCode(raw: string): string {
+  // Remove markdown fences: ```ts\n...\n``` or ```javascript\n...\n```
+  const fenceMatch = raw.match(/^```[\w]*\n([\s\S]*?)```\s*$/m)
+  if (fenceMatch) return fenceMatch[1].trim()
+  // Single-line backtick wrap
+  if (raw.startsWith('`') && raw.endsWith('`') && !raw.slice(1, -1).includes('`')) {
+    return raw.slice(1, -1).trim()
+  }
+  return raw.trim()
+}
+
+/**
  * Extracts the first function name from submitted code.
  * Handles: function foo(, const foo =, const foo=(
  */
@@ -35,7 +51,8 @@ export async function executeCode(
   try {
     const { runInNewContext } = await import('vm')
 
-    const fnName = extractFunctionName(code)
+    const processedCode = preprocessCode(code)
+    const fnName = extractFunctionName(processedCode)
     if (!fnName) {
       return {
         passed: false,
@@ -60,7 +77,7 @@ export async function executeCode(
       : testInput
 
     const wrappedCode = `
-${code}
+${processedCode}
 
 try {
   const _result = ${fnName}(${JSON.stringify(parsedInput)});

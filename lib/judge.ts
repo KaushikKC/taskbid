@@ -35,8 +35,8 @@ export async function judgeSubmission(
       }
     }
 
-    // Execution errored (syntax error, timeout, etc.) — still wrong
-    if (exec.error && !exec.error.includes('not a function')) {
+    // Any execution error except "no function found" = wrong answer, no need for LLM
+    if (exec.error && exec.error !== 'Could not detect function name in submitted code') {
       return {
         correct: false,
         score: 0,

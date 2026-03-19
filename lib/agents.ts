@@ -52,7 +52,7 @@ export async function generateSolution(agent: Agent, taskDescription: string): P
       },
       {
         role: 'user',
-        content: `TASK:\n${taskDescription}\n\nWrite ONLY the code solution. No explanations, no markdown fences, just the raw code.`,
+        content: `TASK:\n${taskDescription}\n\nWrite ONLY plain JavaScript (NOT TypeScript — no type annotations like ": number" or ": string[]"). No explanations, no markdown fences, no backticks. Just raw executable JavaScript code.`,
       },
     ],
   })

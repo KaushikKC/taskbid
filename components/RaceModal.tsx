@@ -13,11 +13,15 @@ type TaskDetail = {
   submissions: Submission[]
 }
 
-const AGENT_COLORS: Record<string, string> = {
-  'Agent Alpha': '#f59e0b',
-  'Agent Beta': '#60a5fa',
-  'Agent Gamma': '#a78bfa',
-}
+const BUILTIN_COLORS = ['#f59e0b', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#fb923c']
+
+type CompetingAgent = { id: string; name: string; emoji: string; strategy?: string; type: 'built-in' | 'external' }
+
+const DEFAULT_AGENTS: CompetingAgent[] = [
+  { id: 'agent_alpha', name: 'Agent Alpha', emoji: '⚡', strategy: 'Fast & aggressive', type: 'built-in' },
+  { id: 'agent_beta',  name: 'Agent Beta',  emoji: '🔬', strategy: 'Methodical',        type: 'built-in' },
+  { id: 'agent_gamma', name: 'Agent Gamma', emoji: '🧠', strategy: 'Creative',           type: 'built-in' },
+]
 
 export default function RaceModal({ task: initialTask, onClose }: Props) {
   const [detail, setDetail] = useState<TaskDetail>({ task: initialTask, submissions: [] })
@@ -25,6 +29,7 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
   const [started, setStarted] = useState(initialTask.status !== 'open')
   const [starting, setStarting] = useState(false)
   const [activeTab, setActiveTab] = useState<'feed' | 'solutions'>('feed')
+  const [competitors, setCompetitors] = useState<CompetingAgent[]>(DEFAULT_AGENTS)
   const feedBottomRef = useRef<HTMLDivElement>(null)
   const evtSourceRef = useRef<EventSource | null>(null)
 
@@ -64,9 +69,21 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
   const startRace = async () => {
     setStarting(true)
     setStarted(true)
-    await fetch(`/api/tasks/${initialTask.id}/compete`, { method: 'POST' })
+    const res = await fetch(`/api/tasks/${initialTask.id}/compete`, { method: 'POST' })
+    const data = await res.json()
+    if (data.agents) setCompetitors(data.agents)
     setStarting(false)
   }
+
+  // If race already started, load the competitors from leaderboard
+  useEffect(() => {
+    if (initialTask.status !== 'open') {
+      fetch('/api/agents').then(r => r.json()).then(data => {
+        // Build competitor list from submissions — whoever submitted is competing
+        // (we don't know exact list upfront for already-started races)
+      })
+    }
+  }, [initialTask.status])
 
   const task = detail.task
   const submissions = detail.submissions
@@ -105,20 +122,16 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 10px', flexShrink: 0 }}>✕</button>
         </div>
 
-        {/* Agent status bar */}
+        {/* Agent status bar — dynamic, shows all competitors including external */}
         <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)',
-          display: 'flex', gap: 12, flexShrink: 0 }}>
-          {[
-            { name: 'Agent Alpha', emoji: '⚡', strategy: 'Fast & aggressive' },
-            { name: 'Agent Beta', emoji: '🔬', strategy: 'Methodical' },
-            { name: 'Agent Gamma', emoji: '🧠', strategy: 'Creative' },
-          ].map(agent => {
-            const sub = submissions.find(s => s.agent_name === agent.name)
-            const color = AGENT_COLORS[agent.name]
+          display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          {competitors.map((agent, i) => {
+            const sub = submissions.find(s => s.agent_id === agent.id || s.agent_name === agent.name)
+            const color = BUILTIN_COLORS[i % BUILTIN_COLORS.length]
             return (
-              <div key={agent.name} style={{ flex: 1, padding: '10px 14px',
-                background: 'var(--surface2)', borderRadius: 8,
-                border: `1px solid ${sub?.is_correct ? color + '66' : 'var(--border)'}`,
+              <div key={agent.id} style={{ flex: '1 1 160px', padding: '10px 14px',
+                background: 'var(--surface2)', borderRadius: 8, minWidth: 140,
+                border: `1px solid ${sub?.is_correct ? color + '88' : 'var(--border)'}`,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{agent.emoji} {agent.name}</span>
@@ -135,10 +148,12 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>Waiting</span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{agent.strategy}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  {agent.strategy ?? (agent.type === 'external' ? '🔌 External agent' : '')}
+                </div>
                 {sub && (
-                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
-                    Score: <span style={{ color }}>{sub.is_correct ? '100' : '0'}/100</span>
+                  <div style={{ fontSize: 10, color: color, marginTop: 4, fontFamily: 'monospace' }}>
+                    {sub.judge_method === 'execution' ? `⚙ ${sub.execution_ms}ms` : '🤖 LLM'}
                   </div>
                 )}
               </div>
@@ -221,7 +236,7 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 16 }}>{sub.agent_emoji}</span>
                       <span style={{ fontWeight: 600, fontSize: 13,
-                        color: AGENT_COLORS[sub.agent_name] ?? 'var(--text)' }}>
+                        color: BUILTIN_COLORS[competitors.findIndex(c => c.name === sub.agent_name) % BUILTIN_COLORS.length] ?? 'var(--text)' }}>
                         {sub.agent_name}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--muted)' }}>
