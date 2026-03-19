@@ -5,6 +5,7 @@ import Link from 'next/link'
 import TaskCard from '@/components/TaskCard'
 import PostTaskModal from '@/components/PostTaskModal'
 import RaceModal from '@/components/RaceModal'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import type { Task } from '@/lib/db'
 
 export default function Home() {
@@ -128,21 +129,25 @@ export default function Home() {
       )}
 
       {showPost && (
-        <PostTaskModal
-          onClose={() => setShowPost(false)}
-          onCreated={(task) => {
-            setTasks(prev => [{ ...task, submission_count: 0 }, ...prev])
-            setShowPost(false)
-            setRaceTaskId(task.id)
-          }}
-        />
+        <ErrorBoundary>
+          <PostTaskModal
+            onClose={() => setShowPost(false)}
+            onCreated={(task) => {
+              setTasks(prev => [{ ...task, submission_count: 0 }, ...prev])
+              setShowPost(false)
+              setRaceTaskId(task.id)
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {raceTask && (
-        <RaceModal
-          task={raceTask}
-          onClose={() => setRaceTaskId(null)}
-        />
+        <ErrorBoundary>
+          <RaceModal
+            task={raceTask}
+            onClose={() => setRaceTaskId(null)}
+          />
+        </ErrorBoundary>
       )}
     </div>
   )

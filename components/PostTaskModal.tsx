@@ -206,6 +206,16 @@ export default function PostTaskModal({ onClose, onCreated }: Props) {
             (after 5% platform fee) settled in 0.6s.
           </div>
 
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, fontSize: 13,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+              color: '#f87171',
+            }}>
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}

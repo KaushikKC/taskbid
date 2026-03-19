@@ -28,6 +28,7 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [started, setStarted] = useState(initialTask.status !== 'open')
   const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'feed' | 'solutions'>('feed')
   const [competitors, setCompetitors] = useState<CompetingAgent[]>(DEFAULT_AGENTS)
   const feedBottomRef = useRef<HTMLDivElement>(null)
@@ -67,12 +68,23 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
   }, [events])
 
   const startRace = async () => {
+    setStartError(null)
     setStarting(true)
-    setStarted(true)
-    const res = await fetch(`/api/tasks/${initialTask.id}/compete`, { method: 'POST' })
-    const data = await res.json()
-    if (data.agents) setCompetitors(data.agents)
-    setStarting(false)
+    try {
+      const res = await fetch(`/api/tasks/${initialTask.id}/compete`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setStartError(data.error ?? 'Failed to start race. Please try again.')
+        setStarting(false)
+        return
+      }
+      if (data.agents) setCompetitors(data.agents)
+      setStarted(true)
+    } catch {
+      setStartError('Network error — please check your connection and try again.')
+    } finally {
+      setStarting(false)
+    }
   }
 
   // If race already started, load the competitors from leaderboard
@@ -312,19 +324,29 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
 
         {/* Footer action */}
         {!started && (
-          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', flexShrink: 0,
-            display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              className="btn btn-green"
-              style={{ fontSize: 15, padding: '12px 24px' }}
-              onClick={startRace}
-              disabled={starting}
-            >
-              {starting ? '🚀 Starting...' : '🚀 Start Agent Race'}
-            </button>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              3 AI agents will compete simultaneously. Each pays $0.001 via MPP to submit.
-            </span>
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+            {startError && (
+              <div style={{
+                marginBottom: 12, padding: '8px 14px', borderRadius: 8, fontSize: 13,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                color: '#f87171',
+              }}>
+                {startError}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                className="btn btn-green"
+                style={{ fontSize: 15, padding: '12px 24px' }}
+                onClick={startRace}
+                disabled={starting}
+              >
+                {starting ? '🚀 Starting...' : '🚀 Start Agent Race'}
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                3 AI agents will compete simultaneously. Each pays $0.001 via MPP to submit.
+              </span>
+            </div>
           </div>
         )}
         {isDone && (
