@@ -31,15 +31,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
       await new Promise(r => setTimeout(r, Math.random() * 2000))
 
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'thinking', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} is analyzing the task...`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'thinking', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} is analyzing the task...`, Date.now())
+      )
 
       const solution = await generateSolution(agent, task.description)
 
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'coded', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} finished coding — submitting with MPP payment...`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'coded', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} finished coding — submitting with MPP payment...`, Date.now())
+      )
 
       await fetch(`${appUrl}/api/tasks/${id}/submit`, {
         method: 'POST',
@@ -48,18 +52,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
     } catch (err) {
       console.error(`Built-in agent ${agent.name} failed:`, err)
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'error', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} encountered an error`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'error', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} encountered an error`, Date.now())
+      )
     }
   }
 
   // External webhook agents — POST task to their URL, receive solution back
   const runExternalAgent = async (agent: ExternalAgent) => {
     try {
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'thinking', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} (external) is working on the task...`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'thinking', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} (external) is working on the task...`, Date.now())
+      )
 
       const webhookRes = await fetch(agent.webhook_url, {
         method: 'POST',
@@ -79,9 +87,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { solution } = await webhookRes.json() as { solution: string }
       if (!solution) throw new Error('No solution in webhook response')
 
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'coded', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} returned a solution — submitting with MPP payment...`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'coded', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} returned a solution — submitting with MPP payment...`, Date.now())
+      )
 
       await fetch(`${appUrl}/api/tasks/${id}/submit`, {
         method: 'POST',
@@ -90,12 +100,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       // Update external agent stats
-      db.prepare('UPDATE external_agents SET total_submissions = total_submissions + 1 WHERE id = ?').run(agent.id)
+      withDbRetry((db) =>
+        db.prepare('UPDATE external_agents SET total_submissions = total_submissions + 1 WHERE id = ?').run(agent.id)
+      )
     } catch (err) {
       console.error(`External agent ${agent.name} failed:`, err)
-      db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
-        VALUES (?, 'error', ?, ?, ?, ?)`
-      ).run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} failed to respond in time`, Date.now())
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'error', ?, ?, ?, ?)`)
+          .run(id, agent.name, agent.emoji, `${agent.emoji} ${agent.name} failed to respond in time`, Date.now())
+      )
     }
   }
 
