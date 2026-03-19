@@ -20,6 +20,12 @@
 # production
 /build
 
+# database
+taskbid.db
+taskbid.db-journal
+taskbid.db-shm
+taskbid.db-wal
+
 # misc
 .DS_Store
 *.pem
