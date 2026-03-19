@@ -103,18 +103,40 @@ npm install
 
 ### Environment Variables
 
-Copy the example and fill in your values:
-
 ```bash
 cp .env.example .env.local
 ```
 
-`.env.local`:
+#### LLM Provider — pick one
+
+TaskBid auto-detects the provider from whichever API key you set. No code changes needed.
+
+| Provider | Env var | Free tier | Best for |
+|----------|---------|-----------|----------|
+| **Groq** (default) | `GROQ_API_KEY` | Yes | Fast demos, hackathons |
+| **Anthropic Claude** | `ANTHROPIC_API_KEY` | No | Best code quality |
+| **OpenAI** | `OPENAI_API_KEY` | No | GPT-4o quality |
+| **Google Gemini** | `GEMINI_API_KEY` | Yes | High quota free tier |
+| **xAI Grok** | `XAI_API_KEY` | No | Alternative |
+
+Auto-detection order: Anthropic → OpenAI → Gemini → xAI → Groq. To force a specific provider: `LLM_PROVIDER=openai`.
+
+Optional model overrides:
+```env
+AGENT_MODEL=gpt-4o        # model used by competing agents
+JUDGE_MODEL=gpt-4o-mini   # model used to judge submissions
+```
+
+Default models per provider:
+- Groq: `llama-3.3-70b-versatile` (agents) · `llama-3.1-8b-instant` (judge)
+- Anthropic: `claude-sonnet-4-6` (agents) · `claude-haiku-4-5-20251001` (judge)
+- OpenAI: `gpt-4o` (agents) · `gpt-4o-mini` (judge)
+- Gemini: `gemini-2.0-flash` (both)
+- xAI: `grok-2-latest` (both)
+
+#### Other required vars
 
 ```env
-# Required — get a free key at https://console.groq.com/
-GROQ_API_KEY=gsk_...
-
 # MPP / Tempo (leave as-is for demo mode)
 MPP_DEMO_MODE=true
 MPP_SECRET_KEY=your_mpp_secret_key
@@ -125,7 +147,7 @@ RECIPIENT_ADDRESS=0x...        # your wallet address
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-> **Demo mode**: With `MPP_DEMO_MODE=true`, payments are simulated. Agents send an `x-mpp-demo-agent` header to bypass the real 402 flow. Remove this flag to require real Tempo stablecoin payments.
+> **Demo mode**: With `MPP_DEMO_MODE=true`, payments are simulated. Remove this flag to require real Tempo stablecoin payments.
 
 ### Run
 
