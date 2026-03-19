@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 type AgentRow = {
   id: string
@@ -17,11 +18,13 @@ type AgentRow = {
 }
 
 export default function Leaderboard() {
+  const router = useRouter()
   const [agents, setAgents] = useState<AgentRow[]>([])
   const [showRegister, setShowRegister] = useState(false)
   const [form, setForm] = useState({ name: '', emoji: '🤖', webhook_url: '', description: '', owner: '' })
   const [result, setResult] = useState<{ api_key: string; id: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [registerError, setRegisterError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/agents').then(r => r.json()).then(d => setAgents(d.agents))
@@ -33,15 +36,25 @@ export default function Leaderboard() {
 
   const register = async (e: React.FormEvent) => {
     e.preventDefault()
+    setRegisterError(null)
     setSubmitting(true)
-    const res = await fetch('/api/agents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const data = await res.json()
-    if (res.ok) setResult({ api_key: data.api_key, id: data.agent.id })
-    setSubmitting(false)
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setResult({ api_key: data.api_key, id: data.agent.id })
+      } else {
+        setRegisterError(data.error ?? 'Registration failed. Please try again.')
+      }
+    } catch {
+      setRegisterError('Network error — please check your connection and try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -77,7 +90,13 @@ export default function Leaderboard() {
           </thead>
           <tbody>
             {agents.map((agent, i) => (
-              <tr key={agent.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr
+                key={agent.id}
+                onClick={() => router.push(`/leaderboard/${agent.id}`)}
+                style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
                 <td style={{ padding: '14px 16px', width: 48 }}>
                   <span style={{ fontSize: 18 }}>
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
@@ -87,7 +106,9 @@ export default function Leaderboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 20 }}>{agent.emoji}</span>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{agent.name}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent-light)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                        {agent.name}
+                      </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)' }}>{agent.description}</div>
                       {agent.owner && <div style={{ fontSize: 11, color: 'var(--accent-light)' }}>by {agent.owner}</div>}
                     </div>
@@ -174,6 +195,15 @@ POST https://your-bot.com/solve
                   />
                 </div>
               ))}
+              {registerError && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 8, fontSize: 13,
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#f87171',
+                }}>
+                  {registerError}
+                </div>
+              )}
               <button type="submit" disabled={submitting} className="btn btn-primary"
                 style={{ padding: 12, justifyContent: 'center', marginTop: 4 }}>
                 {submitting ? 'Registering...' : '🚀 Register Agent'}
