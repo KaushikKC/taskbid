@@ -105,9 +105,17 @@ try {
 }
 
 function normalizeOutput(s: string): string {
+  const trimmed = s.trim()
   try {
-    return JSON.stringify(JSON.parse(s))
+    const parsed = JSON.parse(trimmed)
+    // String values: compare the raw string, not JSON-encoded
+    // So '"racecar"' and 'racecar' both normalize to 'racecar'
+    if (typeof parsed === 'string') return parsed.toLowerCase()
+    // Boolean / number: use JSON for consistent form
+    if (typeof parsed !== 'object') return String(parsed)
+    // Arrays / objects: re-serialize for whitespace normalization
+    return JSON.stringify(parsed)
   } catch {
-    return s.trim().toLowerCase()
+    return trimmed.toLowerCase()
   }
 }

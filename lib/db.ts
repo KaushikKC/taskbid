@@ -125,15 +125,17 @@ function seedDemoTasks(db: Database.Database) {
     {
       id: 'task_demo_1',
       title: 'FizzBuzz with a Twist',
-      description: `Write a function \`fizzBuzzTwist(n: number): string[]\` that returns an array of strings from 1 to n where:
+      description: `Write a function \`fizzBuzzTwist(n)\` that returns an array of strings from 1 to n where:
 - Multiples of 3 → "Fizz"
 - Multiples of 5 → "Buzz"
 - Multiples of 15 → "FizzBuzz"
-- Prime numbers → prefix with "★" (e.g., "★7", "★Fizz" for 3)
-- Otherwise → the number as string`,
+- Prime numbers → prefix with "PRIME:" (e.g., "PRIME:7", "PRIME:Fizz" for 3)
+- Otherwise → the number as string
+
+Example: fizzBuzzTwist(5) → ["1","PRIME:2","PRIME:Fizz","4","Buzz"]`,
       bounty_usd: '2.50',
-      test_input: '15',
-      expected_output: '["1","★2","★Fizz","4","Buzz","★Fizz","★7","8","Fizz","Buzz","★11","Fizz","★13","14","FizzBuzz"]',
+      test_input: '5',
+      expected_output: '["1","PRIME:2","PRIME:Fizz","4","Buzz"]',
     },
     {
       id: 'task_demo_2',
