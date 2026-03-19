@@ -207,11 +207,15 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                   No submissions yet
                 </div>
               )}
-              {submissions.map(sub => (
+              {submissions.map(sub => {
+                const isWinner = sub.is_correct === 1
+                const wasCorrectButLate = !isWinner && sub.judge_method === 'execution' && sub.actual_output === task.expected_output
+                return (
                 <div key={sub.id} style={{
                   borderRadius: 10, overflow: 'hidden',
-                  border: `1px solid ${sub.is_correct ? 'rgba(16,185,129,0.4)' : 'var(--border)'}`,
+                  border: `1px solid ${isWinner ? 'rgba(245,158,11,0.5)' : 'var(--border)'}`,
                 }}>
+                  {/* Header row */}
                   <div style={{ padding: '10px 14px', background: 'var(--surface2)',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -224,32 +228,69 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
                         {new Date(sub.created_at).toLocaleTimeString()}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Judge method badge */}
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace',
+                        background: sub.judge_method === 'execution' ? 'rgba(16,185,129,0.1)' : 'rgba(96,165,250,0.1)',
+                        color: sub.judge_method === 'execution' ? 'var(--green)' : '#60a5fa',
+                        border: `1px solid ${sub.judge_method === 'execution' ? 'rgba(16,185,129,0.3)' : 'rgba(96,165,250,0.3)'}` }}>
+                        {sub.judge_method === 'execution' ? `⚙ executed ${sub.execution_ms}ms` : '🤖 LLM judge'}
+                      </span>
                       {sub.payment_receipt && (
                         <span style={{ fontSize: 10, color: 'var(--accent-light)', fontFamily: 'monospace',
-                          padding: '2px 6px', background: 'rgba(124,58,237,0.1)', borderRadius: 4 }}>
+                          padding: '2px 6px', background: 'rgba(124,58,237,0.1)', borderRadius: 4,
+                          border: '1px solid rgba(124,58,237,0.3)' }}>
                           MPP ✓
                         </span>
                       )}
                       <span style={{ fontSize: 12, fontWeight: 700,
-                        color: sub.is_correct ? 'var(--gold)' : task.winner_agent_name && !sub.is_correct ? 'var(--muted)' : 'var(--red)' }}>
-                        {sub.is_correct ? '🏆 WINNER' : task.winner_agent_name ? '⏱ Too slow' : '✗ Wrong'}
+                        color: isWinner ? 'var(--gold)' : wasCorrectButLate ? 'var(--muted)' : 'var(--red)' }}>
+                        {isWinner ? '🏆 WINNER' : wasCorrectButLate ? '⏱ Too slow' : '✗ Wrong'}
                       </span>
                     </div>
                   </div>
+
+                  {/* Code */}
                   <pre style={{ margin: 0, padding: '14px', background: '#0d0d14',
-                    fontSize: 12, lineHeight: 1.6, overflowX: 'auto', maxHeight: 200,
+                    fontSize: 12, lineHeight: 1.6, overflowX: 'auto', maxHeight: 220,
                     fontFamily: 'JetBrains Mono, Fira Code, monospace', color: '#c9d1d9' }}>
                     {sub.solution}
                   </pre>
-                  {sub.judge_feedback && (
+
+                  {/* Execution result row */}
+                  {sub.judge_method === 'execution' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
+                      borderTop: '1px solid var(--border)' }}>
+                      <div style={{ padding: '8px 14px', borderRight: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Actual output
+                        </div>
+                        <code style={{ fontSize: 12, color: isWinner ? 'var(--green)' : 'var(--red)',
+                          fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {sub.actual_output || '(empty)'}
+                        </code>
+                      </div>
+                      <div style={{ padding: '8px 14px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Expected output
+                        </div>
+                        <code style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {task.expected_output || '—'}
+                        </code>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LLM feedback row */}
+                  {sub.judge_method === 'llm' && sub.judge_feedback && (
                     <div style={{ padding: '8px 14px', background: 'var(--surface2)',
                       fontSize: 12, color: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
-                      ⚖️ Judge: {sub.judge_feedback}
+                      🤖 {sub.judge_feedback}
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

@@ -31,6 +31,9 @@ function getDb(): Database.Database {
         solution TEXT NOT NULL,
         is_correct INTEGER DEFAULT 0,
         judge_feedback TEXT,
+        judge_method TEXT DEFAULT 'llm',
+        actual_output TEXT,
+        execution_ms INTEGER,
         payment_receipt TEXT,
         created_at INTEGER NOT NULL
       );
@@ -141,6 +144,9 @@ export type Submission = {
   solution: string
   is_correct: number
   judge_feedback: string | null
+  judge_method: 'execution' | 'llm'
+  actual_output: string | null
+  execution_ms: number | null
   payment_receipt: string | null
   created_at: number
 }

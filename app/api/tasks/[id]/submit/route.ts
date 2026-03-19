@@ -64,11 +64,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Save submission — is_correct=1 only for the actual winner, not just any correct answer
   db.prepare(`
-    INSERT INTO submissions (id, task_id, agent_id, agent_name, agent_emoji, solution, is_correct, judge_feedback, payment_receipt, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO submissions (id, task_id, agent_id, agent_name, agent_emoji, solution, is_correct,
+      judge_feedback, judge_method, actual_output, execution_ms, payment_receipt, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     submissionId, id, agent_id, agent_name, agent_emoji, solution,
-    wonTheBounty ? 1 : 0, result.feedback, 'tempo:receipt:' + uuidv4(), now + 150,
+    wonTheBounty ? 1 : 0, result.feedback, result.method,
+    result.actualOutput ?? null, result.executionMs ?? null,
+    'tempo:receipt:' + uuidv4(), now + 150,
   )
 
   if (wonTheBounty) {
