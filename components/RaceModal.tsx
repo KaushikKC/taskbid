@@ -29,6 +29,11 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
   const [started, setStarted] = useState(initialTask.status !== 'open')
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
+  const [llmInfo, setLlmInfo] = useState<{ provider: string; agentModel: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/agents').then(r => r.json()).then(d => { if (d.llm) setLlmInfo(d.llm) })
+  }, [])
   const [activeTab, setActiveTab] = useState<'feed' | 'solutions'>('feed')
   const [competitors, setCompetitors] = useState<CompetingAgent[]>(DEFAULT_AGENTS)
   const feedBottomRef = useRef<HTMLDivElement>(null)
@@ -176,10 +181,17 @@ export default function RaceModal({ task: initialTask, onClose }: Props) {
         {/* MPP payment info */}
         <div style={{ padding: '8px 24px', borderBottom: '1px solid var(--border)',
           background: 'rgba(124,58,237,0.06)', flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span>⚡ <strong style={{ color: 'var(--accent-light)' }}>MPP Protocol</strong> — each submission requires a $0.001 Tempo stablecoin payment</span>
             <span>HTTP 402 challenge → auto-paid → receipt attached</span>
             <span>Winner paid in <strong style={{ color: 'var(--green)' }}>0.6s</strong></span>
+            {llmInfo && (
+              <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4,
+                background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
+                color: 'var(--accent-light)', fontFamily: 'monospace' }}>
+                🤖 {llmInfo.provider} · {llmInfo.agentModel}
+              </span>
+            )}
           </div>
         </div>
 

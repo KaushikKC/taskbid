@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, ExternalAgent, withDbRetry } from '@/lib/db'
+import { getProviderInfo } from '@/lib/llm'
 import { v4 as uuidv4 } from 'uuid'
 
 // GET /api/agents — leaderboard
@@ -47,7 +48,10 @@ export async function GET() {
     (a, b) => b.total_earned_usd - a.total_earned_usd
   )
 
-  return NextResponse.json({ agents: all })
+  let llm = null
+  try { llm = getProviderInfo() } catch { /* no key set yet */ }
+
+  return NextResponse.json({ agents: all, llm })
 }
 
 // POST /api/agents — register an external agent
