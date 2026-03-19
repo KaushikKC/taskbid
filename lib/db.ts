@@ -1,0 +1,142 @@
+import Database from 'better-sqlite3'
+import path from 'path'
+
+let db: Database.Database
+
+function getDb(): Database.Database {
+  if (!db) {
+    db = new Database(path.join(process.cwd(), 'taskbid.db'))
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        bounty_usd TEXT NOT NULL,
+        status TEXT DEFAULT 'open',
+        created_at INTEGER NOT NULL,
+        winner_agent_id TEXT,
+        winner_agent_name TEXT,
+        winning_solution TEXT,
+        completed_at INTEGER,
+        test_input TEXT,
+        expected_output TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS submissions (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        agent_name TEXT NOT NULL,
+        agent_emoji TEXT NOT NULL,
+        solution TEXT NOT NULL,
+        is_correct INTEGER DEFAULT 0,
+        judge_feedback TEXT,
+        payment_receipt TEXT,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS feed_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        agent_name TEXT,
+        agent_emoji TEXT,
+        message TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `)
+
+    // Seed with demo tasks if empty
+    const count = (db.prepare('SELECT COUNT(*) as c FROM tasks').get() as { c: number }).c
+    if (count === 0) {
+      seedDemoTasks(db)
+    }
+  }
+  return db
+}
+
+function seedDemoTasks(db: Database.Database) {
+  const tasks = [
+    {
+      id: 'task_demo_1',
+      title: 'FizzBuzz with a Twist',
+      description: `Write a function \`fizzBuzzTwist(n: number): string[]\` that returns an array of strings from 1 to n where:
+- Multiples of 3 → "Fizz"
+- Multiples of 5 → "Buzz"
+- Multiples of 15 → "FizzBuzz"
+- Prime numbers → prefix with "★" (e.g., "★7", "★Fizz" for 3)
+- Otherwise → the number as string`,
+      bounty_usd: '2.50',
+      test_input: '15',
+      expected_output: '["1","★2","★Fizz","4","Buzz","★Fizz","★7","8","Fizz","Buzz","★11","Fizz","★13","14","FizzBuzz"]',
+    },
+    {
+      id: 'task_demo_2',
+      title: 'Balanced Brackets Validator',
+      description: `Write a function \`isBalanced(s: string): boolean\` that returns true if all brackets are properly balanced and nested.
+Supports: \`()\`, \`[]\`, \`{}\`
+Examples: \`"({[]})" → true\`, \`"([)]" → false\`, \`"{[}" → false\``,
+      bounty_usd: '1.00',
+      test_input: '({[]})',
+      expected_output: 'true',
+    },
+    {
+      id: 'task_demo_3',
+      title: 'Longest Palindromic Substring',
+      description: `Write a function \`longestPalindrome(s: string): string\` that finds the longest palindromic substring.
+If multiple exist with the same length, return the first one.
+Example: \`"babad" → "bab"\`, \`"cbbd" → "bb"\``,
+      bounty_usd: '5.00',
+      test_input: 'racecarxyz',
+      expected_output: 'racecar',
+    },
+  ]
+
+  const insert = db.prepare(`
+    INSERT INTO tasks (id, title, description, bounty_usd, status, created_at, test_input, expected_output)
+    VALUES (@id, @title, @description, @bounty_usd, 'open', @created_at, @test_input, @expected_output)
+  `)
+
+  for (const task of tasks) {
+    insert.run({ ...task, created_at: Date.now() - Math.random() * 3600000 })
+  }
+}
+
+export { getDb }
+export type Task = {
+  id: string
+  title: string
+  description: string
+  bounty_usd: string
+  status: 'open' | 'in_progress' | 'completed'
+  created_at: number
+  winner_agent_id: string | null
+  winner_agent_name: string | null
+  winning_solution: string | null
+  completed_at: number | null
+  test_input: string | null
+  expected_output: string | null
+}
+
+export type Submission = {
+  id: string
+  task_id: string
+  agent_id: string
+  agent_name: string
+  agent_emoji: string
+  solution: string
+  is_correct: number
+  judge_feedback: string | null
+  payment_receipt: string | null
+  created_at: number
+}
+
+export type FeedEvent = {
+  id: number
+  task_id: string
+  type: string
+  agent_name: string | null
+  agent_emoji: string | null
+  message: string
+  created_at: number
+}
