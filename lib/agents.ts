@@ -1,8 +1,4 @@
-import Groq from 'groq-sdk'
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+import { agentChat } from './llm'
 
 export type Agent = {
   id: string
@@ -41,21 +37,14 @@ export const AGENTS: Agent[] = [
 ]
 
 export async function generateSolution(agent: Agent, taskDescription: string): Promise<string> {
-  const response = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    max_tokens: 1024,
-    temperature: agent.temperature,
-    messages: [
-      {
-        role: 'system',
-        content: agent.strategy,
-      },
+  return agentChat(
+    [
+      { role: 'system', content: agent.strategy },
       {
         role: 'user',
         content: `TASK:\n${taskDescription}\n\nWrite ONLY plain JavaScript (NOT TypeScript — no type annotations like ": number" or ": string[]"). No explanations, no markdown fences, no backticks. Just raw executable JavaScript code.`,
       },
     ],
-  })
-
-  return (response.choices[0]?.message?.content ?? '').trim()
+    agent.temperature,
+  )
 }

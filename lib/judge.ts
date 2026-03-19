@@ -1,13 +1,11 @@
-import Groq from 'groq-sdk'
+import { judgeChat } from './llm'
 import { executeCode } from './executor'
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export type JudgeResult = {
   correct: boolean
   feedback: string
   score: number
-  method: 'execution' | 'llm' // how the solution was judged
+  method: 'execution' | 'llm'
   actualOutput?: string
   executionMs?: number
 }
@@ -36,7 +34,7 @@ export async function judgeSubmission(
     }
 
     // Any execution error except "no function found" = wrong answer, no need for LLM
-    if (exec.error && exec.error !== 'Could not detect function name in submitted code') {
+    if (exec.error !== 'Could not detect function name in submitted code') {
       return {
         correct: false,
         score: 0,
@@ -47,7 +45,7 @@ export async function judgeSubmission(
     }
   }
 
-  // ── Phase 2: LLM judge fallback (for research/open-ended tasks) ─────────────
+  // ── Phase 2: LLM judge fallback (for open-ended tasks or undetectable functions) ──
   const prompt = `You are a strict code judge. Evaluate this submission and respond in JSON only.
 
 TASK: ${taskDescription}
@@ -62,15 +60,8 @@ ${solution}
 JSON response (no other text):
 {"correct": true/false, "score": 0-100, "feedback": "one sentence"}`
 
-  const response = await groq.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
-    max_tokens: 128,
-    temperature: 0,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
   try {
-    const text = response.choices[0]?.message?.content ?? ''
+    const text = await judgeChat([{ role: 'user', content: prompt }])
     const json = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? '{}')
     return {
       correct: Boolean(json.correct),
