@@ -116,7 +116,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   Promise.all([
     ...AGENTS.map(runBuiltInAgent),
     ...externalAgents.map(runExternalAgent),
-  ]).catch(console.error)
+  ]).then(() => {
+    // Auto-reset: if no agent won, release the task back to open after all agents finish
+    const finalTask = withDbRetry((db) =>
+      db.prepare('SELECT status FROM tasks WHERE id = ?').get(id) as { status: string } | undefined
+    )
+    if (finalTask?.status === 'in_progress') {
+      withDbRetry((db) =>
+        db.prepare("UPDATE tasks SET status='open' WHERE id = ? AND status='in_progress'").run(id)
+      )
+      withDbRetry((db) =>
+        db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+          VALUES (?, 'error', NULL, NULL, ?, ?)`)
+          .run(id, '⚠️ No agent solved the task — race reset to open. Try again!', Date.now())
+      )
+    }
+  }).catch(console.error)
+
+  // Safety net: hard timeout — reset task if still in_progress after 35s
+  setTimeout(() => {
+    try {
+      const check = withDbRetry((db) =>
+        db.prepare('SELECT status FROM tasks WHERE id = ?').get(id) as { status: string } | undefined
+      )
+      if (check?.status === 'in_progress') {
+        withDbRetry((db) =>
+          db.prepare("UPDATE tasks SET status='open' WHERE id = ? AND status='in_progress'").run(id)
+        )
+        withDbRetry((db) =>
+          db.prepare(`INSERT INTO feed_events (task_id, type, agent_name, agent_emoji, message, created_at)
+            VALUES (?, 'error', NULL, NULL, ?, ?)`)
+            .run(id, '⏱️ Race timed out — task reset to open.', Date.now())
+        )
+      }
+    } catch (e) {
+      console.error('Timeout reset failed:', e)
+    }
+  }, 35_000)
 
   return NextResponse.json({
     started: true,

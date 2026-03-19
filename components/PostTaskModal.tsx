@@ -34,6 +34,7 @@ export default function PostTaskModal({ onClose, onCreated }: Props) {
   const [testInput, setTestInput] = useState('')
   const [expectedOutput, setExpectedOutput] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const loadExample = (ex: typeof EXAMPLES[0]) => {
     setTitle(ex.title)
@@ -45,6 +46,7 @@ export default function PostTaskModal({ onClose, onCreated }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setSubmitting(true)
     try {
       const res = await fetch('/api/tasks', {
@@ -59,7 +61,13 @@ export default function PostTaskModal({ onClose, onCreated }: Props) {
         }),
       })
       const data = await res.json()
-      if (res.ok) onCreated(data.task)
+      if (res.ok) {
+        onCreated(data.task)
+      } else {
+        setError(data.error ?? 'Failed to create task. Please try again.')
+      }
+    } catch {
+      setError('Network error — please check your connection and try again.')
     } finally {
       setSubmitting(false)
     }
